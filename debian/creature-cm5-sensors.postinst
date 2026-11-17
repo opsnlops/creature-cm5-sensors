@@ -1,0 +1,101 @@
+#!/bin/sh
+set -e
+
+# debhelper first: dh_dkms builds and installs the module for every
+# kernel with headers before the overlay below asks for it.
+#DEBHELPER#
+
+overlay=creature-cm5-sensors
+dtbo=/usr/lib/creature-cm5-sensors/$overlay.dtbo
+firmware=/boot/firmware
+config=$firmware/config.txt
+begin="# BEGIN creature-cm5-sensors"
+end="# END creature-cm5-sensors"
+
+warn() {
+    echo "creature-cm5-sensors: $*" >&2
+}
+
+# Same test as raspi-firmware's kernel hook.
+firmware_mounted() {
+    if ischroot; then
+        return 0
+    elif [ -e /usr/bin/systemd-detect-virt ] && systemd-detect-virt -q; then
+        return 0
+    fi
+    mountpoint -q "$firmware"
+}
+
+# Is the overlay's PAC1954 node in the running device tree?
+overlay_live() {
+    [ -r /proc/device-tree/__symbols__/i2c_arm ] || return 1
+    bus=$(tr -d '\0' < /proc/device-tree/__symbols__/i2c_arm)
+    [ -d "/proc/device-tree$bus/power-monitor@10" ]
+}
+
+install_overlay() {
+    if ! firmware_mounted; then
+        warn "$firmware is not mounted; overlay not installed"
+        return 0
+    fi
+
+    mkdir -p "$firmware/overlays"
+    install -m 0644 "$dtbo" "$firmware/overlays/$overlay.dtbo"
+
+    [ -f "$config" ] || { warn "$config not found; overlay not enabled"; return 0; }
+    if grep -q "^$begin" "$config" || grep -qx "dtoverlay=$overlay" "$config"; then
+        return 0
+    fi
+    # Make sure the file ends in a newline before appending.
+    [ -z "$(tail -c1 "$config")" ] || echo >> "$config"
+    cat >> "$config" <<CONFIG
+$begin (managed by the package; removed when it is removed)
+[all]
+dtoverlay=$overlay
+$end
+CONFIG
+    sync -f "$firmware"
+}
+
+# Bring the sensors up now instead of at the next boot.
+activate() {
+    ischroot && return 0
+    [ -d /proc/device-tree ] || return 0
+
+    if ! overlay_live; then
+        if command -v dtoverlay >/dev/null; then
+            dtoverlay -d /usr/lib/creature-cm5-sensors "$overlay" ||
+                warn "could not apply the overlay now; it applies at the next boot"
+        else
+            warn "dtoverlay not found; the overlay applies at the next boot"
+        fi
+    fi
+
+    # On upgrade, swap in the newly built module.
+    if [ -e /sys/module/pac1954 ]; then
+        loaded=$(cat /sys/module/pac1954/version 2>/dev/null || true)
+        installed=$(modinfo -F version pac1954 2>/dev/null || true)
+        if [ -n "$installed" ] && [ "$loaded" != "$installed" ]; then
+            modprobe -r pac1954 || warn "could not unload the old pac1954 module"
+        fi
+    fi
+    modprobe pac1954 || warn "could not load pac1954"
+    modprobe jc42 || warn "could not load jc42"
+
+    # Apply the MCP9808 limits if jc42 was already bound before the
+    # udev rule existed.
+    if command -v udevadm >/dev/null; then
+        udevadm control --reload || true
+        udevadm trigger --action=add --subsystem-match=hwmon \
+            --attr-match=name=jc42 || true
+    fi
+}
+
+case "$1" in
+    configure)
+        install_overlay
+        activate
+        ;;
+esac
+
+exit 0

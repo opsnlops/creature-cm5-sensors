@@ -1,0 +1,161 @@
+.TH PAC1954 4 2026-11-16 "creature-cm5-sensors" "Kernel Interfaces"
+.SH NAME
+pac1954 \- Microchip PAC1954 power monitor hwmon driver
+.SH SYNOPSIS
+.B modprobe pac1954
+.PP
+.B sensors pac1954\-*
+.SH DESCRIPTION
+.B pac1954
+is a Linux hwmon driver for the Microchip PAC1954 four\-channel power
+monitor.
+For each channel it reports the bus voltage, the current through the shunt
+resistor, and the power.
+It is packaged for the Creature CM5 Carrier board, which has a PAC1954 at
+address 0x10 and an MCP9808 temperature sensor at 0x18, both on I2C1
+(GPIO2/3).
+The MCP9808 uses the in\-kernel
+.B jc42
+driver.
+.PP
+The driver is built with DKMS, so a new kernel gets a new build of the
+module automatically, as long as its headers are installed (the package
+depends on
+.BR linux\-headers\-rpi\-2712 ).
+.PP
+When it starts, the driver checks the product and manufacturer IDs and then
+configures the chip: 1024 samples per second with adaptive accumulation, all
+channels on, unipolar ranges, alerts off, and the SLOW/ALERT1 pin set to
+ALERT.
+The chip's power\-on default for that pin is a SLOW input, and the carrier
+board pulls it high, which would hold the chip at 8 samples per second.
+.SH SYSFS ATTRIBUTES
+Attributes are in
+.IR /sys/class/hwmon/hwmon N /
+where
+.I name
+is
+.BR pac1954 .
+Channels are numbered 1 to 4, matching the datasheet's CH1 to CH4.
+.TP
+.BR in N _input ", " in N _average
+Bus voltage in millivolts: the latest sample, and the chip's rolling average
+of 8 samples.
+Range 0 to 32 V.
+.TP
+.BR curr N _input ", " curr N _average
+Current in milliamperes, the sense voltage divided by the channel's shunt
+resistance.
+The sense range is 0 to 100 mV, so 25 A with a 4 m\(*W shunt.
+Present only when the channel has a shunt value.
+.TP
+.BR power N _input
+Power in microwatts, from the chip's VBUS \(mu VSENSE product.
+Present only when the channel has a shunt value.
+.TP
+.BR in N _label ", " curr N _label ", " power N _label
+The channel's label from the device tree.
+.PP
+Readings are cached for 100 ms.
+Each update sends REFRESH_V, which latches new results without clearing the
+chip's accumulators, and then reads all channels in one transfer.
+.SH CONFIGURATION
+The device is declared in the device tree.
+On the Creature CM5 Carrier board the package's overlay,
+.BR creature\-cm5\-sensors ,
+does this.
+Each channel is a child node with a
+.B reg
+(1 to 4), a
+.B shunt\-resistor\-micro\-ohms
+and an optional
+.BR label :
+.PP
+.RS
+.nf
+power\-monitor@10 {
+    compatible = "microchip,pac1954";
+    reg = <0x10>;
+    #address\-cells = <1>;
+    #size\-cells = <0>;
+    channel@1 {
+        reg = <1>;
+        shunt\-resistor\-micro\-ohms = <4000>;
+        label = "Board In";
+    };
+};
+.fi
+.RE
+.PP
+Channels without a node are hidden.
+If there are no channel nodes at all, all four channels are shown with
+voltage only.
+.PP
+The Creature CM5 Carrier channels are:
+.TP
+.B 1 "Board In"
+SYS_24V, the total board input after the ideal\-diode ORing.
+.TP
+.B 2 "CM5 5V"
+The 5.1 V rail into the CM5.
+.TP
+.B 3 Character
+USB\-C character power.
+.TP
+.B 4 PoE
+The AG5810 output only, which is PoE's share of the input.
+.PP
+All four shunts are 4 m\(*W.
+.SH FILES
+.TP
+.I /usr/src/pac1954\-*/
+Driver source, which DKMS builds for each kernel.
+.TP
+.I /usr/lib/creature\-cm5\-sensors/creature\-cm5\-sensors.dtbo
+The board overlay, copied to
+.I /boot/firmware/overlays/
+when the package is installed or upgraded.
+.TP
+.I /boot/firmware/config.txt
+The package adds a block between
+.B "# BEGIN creature\-cm5\-sensors"
+and
+.B "# END creature\-cm5\-sensors"
+that enables the overlay, and removes it when the package is removed.
+If
+.B dtoverlay=creature\-cm5\-sensors
+is already present elsewhere in the file, no block is added.
+At install time the overlay is also applied to the running system with
+.BR dtoverlay (1),
+so no reboot is needed.
+.TP
+.I /etc/sensors.d/creature\-cm5\-sensors.conf
+.BR sensors.conf (5)
+labels, such as "Board" for the MCP9808.
+.TP
+.I /usr/lib/udev/rules.d/60\-creature\-cm5\-sensors.rules
+Sets the MCP9808 temperature limits (min \-20 \(deC, max 70 \(deC,
+critical 85 \(deC) when the jc42 device appears.
+The chip's limit registers power up at 0 \(deC, which reads as a permanent
+alarm.
+To change the limits, copy this file to
+.I /etc/udev/rules.d/
+under the same name and edit it.
+.SH NOTES
+At light load the current readings have a fixed offset of a few tens of
+milliamperes, which is about 0.1% of full scale.
+.PP
+While the driver is bound,
+.BR i2cget (8)
+and
+.BR i2ctransfer (8)
+need
+.B \-f
+to reach address 0x10.
+Only read with them: a REFRESH from user space disturbs the driver's
+readings.
+.SH SEE ALSO
+.BR sensors (1),
+.BR sensors.conf (5),
+.BR dkms (8),
+.BR dtoverlay (1)

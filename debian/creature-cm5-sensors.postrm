@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+overlay=creature-cm5-sensors
+firmware=/boot/firmware
+config=$firmware/config.txt
+
+case "$1" in
+    remove|purge)
+        rm -f "$firmware/overlays/$overlay.dtbo"
+        if [ -f "$config" ]; then
+            sed -i '/^# BEGIN creature-cm5-sensors/,/^# END creature-cm5-sensors/d' "$config"
+        fi
+        # The running device tree keeps the overlay until reboot; with the
+        # module gone that is harmless. DKMS has already deleted the .ko,
+        # so modprobe -r cannot find it; rmmod does not need to.
+        if ! ischroot; then
+            rmmod pac1954 2>/dev/null || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

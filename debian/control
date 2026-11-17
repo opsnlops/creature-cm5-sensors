@@ -1,0 +1,26 @@
+Source: creature-cm5-sensors
+Section: kernel
+Priority: optional
+Maintainer: April White <april@opsnlops.io>
+Build-Depends: debhelper-compat (= 13), dh-sequence-dkms, device-tree-compiler
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+
+Package: creature-cm5-sensors
+Architecture: all
+Depends: ${misc:Depends}, linux-headers-rpi-2712, raspi-firmware
+Recommends: lm-sensors
+Description: power and temperature sensors on the Creature CM5 Carrier board
+ Makes the sensors on the Creature CM5 Carrier board visible through Linux
+ hwmon, so sensors(1), /sys/class/hwmon and anything that reads hwmon can
+ see them:
+ .
+  * PAC1954 four-channel power monitor (0x10 on I2C1): voltage, current and
+    power for board input, the CM5 5 V rail, character power and PoE.
+  * MCP9808 temperature sensor (0x18 on I2C1), using the in-kernel jc42
+    driver.
+ .
+ The PAC1954 driver is built with DKMS, so it is rebuilt automatically for
+ every new kernel. Installing the package installs the board's device tree
+ overlay, enables it in /boot/firmware/config.txt and applies it straight
+ away, so no reboot is needed.

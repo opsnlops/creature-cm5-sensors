@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+PKG := creature-cm5-sensors
+DKMS_SRC := debian/$(PKG)/usr/src/pac1954-$(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@
+
+# The kernel module is built on the target by DKMS, not here.
+override_dh_auto_build:
+	dtc -@ -I dts -O dtb -o debian/creature-cm5-sensors.dtbo \
+		overlay/creature-cm5-sensors.dts
+
+override_dh_auto_clean:
+	rm -f debian/creature-cm5-sensors.dtbo
+
+override_dh_auto_install:
+	install -D -m 0644 driver/pac1954.c $(DKMS_SRC)/pac1954.c
+	install -D -m 0644 driver/Makefile $(DKMS_SRC)/Makefile
+	install -D -m 0644 debian/creature-cm5-sensors.dtbo \
+		debian/$(PKG)/usr/lib/$(PKG)/creature-cm5-sensors.dtbo
+	install -D -m 0644 config/creature-cm5.conf \
+		debian/$(PKG)/etc/sensors.d/$(PKG).conf
+
+override_dh_dkms:
+	dh_dkms -V $(DEB_VERSION_UPSTREAM)

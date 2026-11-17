@@ -1,0 +1,5 @@
+# MCP9808 board temperature on the Creature CM5 Carrier board.
+# Its limit registers power up at 0 C, which reads as a permanent alarm.
+# Set them when the jc42 hwmon device appears. Values are millidegrees C.
+ACTION=="add", SUBSYSTEM=="hwmon", ATTR{name}=="jc42", \
+  ATTR{temp1_min}="-20000", ATTR{temp1_max}="70000", ATTR{temp1_crit}="85000"

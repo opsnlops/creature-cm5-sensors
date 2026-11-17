@@ -1,0 +1,7 @@
+creature-cm5-sensors (0.1.0) unstable; urgency=medium
+
+  * Initial release: PAC1954 hwmon driver (DKMS), device tree overlay for
+    the Creature CM5 Carrier board's PAC1954 and MCP9808, sensors labels
+    and MCP9808 limits.
+
+ -- April White <april@opsnlops.io>  Mon, 16 Nov 2026 16:29:53 -0800
