@@ -23,7 +23,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            debhelper dh-dkms device-tree-compiler lintian
+            build-essential debhelper dh-dkms device-tree-compiler lintian
 
       - name: Build, check and lint the package
         run: ./make_packages.sh
