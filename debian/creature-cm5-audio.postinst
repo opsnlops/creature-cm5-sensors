@@ -1,0 +1,105 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+overlay=creature-cm5-audio
+dtbo=/usr/lib/creature-cm5-audio/$overlay.dtbo
+firmware=/boot/firmware
+config=$firmware/config.txt
+begin="# BEGIN creature-cm5-audio"
+end="# END creature-cm5-audio"
+# Prefix for overlay lines this package disables; postrm strips it again.
+disabled="#creature-cm5-audio-disabled: "
+
+warn() {
+    echo "creature-cm5-audio: $*" >&2
+}
+
+# Same test as raspi-firmware's kernel hook.
+firmware_mounted() {
+    if ischroot; then
+        return 0
+    elif [ -e /usr/bin/systemd-detect-virt ] && systemd-detect-virt -q; then
+        return 0
+    fi
+    mountpoint -q "$firmware"
+}
+
+# Path of the running device tree's DAC node at 0x4D, from any overlay.
+dac_node() {
+    [ -r /proc/device-tree/__symbols__/i2c_arm ] || return 1
+    bus=$(tr -d '\0' < /proc/device-tree/__symbols__/i2c_arm)
+    for node in "/proc/device-tree$bus"/*@4d; do
+        [ -d "$node" ] && { echo "$node"; return 0; }
+    done
+    return 1
+}
+
+install_overlay() {
+    if ! firmware_mounted; then
+        warn "$firmware is not mounted; overlay not installed"
+        return 0
+    fi
+
+    mkdir -p "$firmware/overlays"
+    install -m 0644 "$dtbo" "$firmware/overlays/$overlay.dtbo"
+
+    [ -f "$config" ] || { warn "$config not found; overlay not enabled"; return 0; }
+
+    # The Allo Boss DAC overlay drives the same DAC; both cannot be enabled.
+    if grep -q '^[[:space:]]*dtoverlay=allo-boss-dac-pcm512x-audio' "$config"; then
+        sed -i "s/^[[:space:]]*dtoverlay=allo-boss-dac-pcm512x-audio/$disabled&/" "$config"
+        warn "disabled dtoverlay=allo-boss-dac-pcm512x-audio in $config"
+    fi
+
+    if ! grep -q "^$begin" "$config" && ! grep -qx "dtoverlay=$overlay" "$config"; then
+        [ -z "$(tail -c1 "$config")" ] || echo >> "$config"
+        cat >> "$config" <<CONFIG
+$begin (managed by the package; removed when it is removed)
+[all]
+dtoverlay=$overlay
+$end
+CONFIG
+    fi
+    sync -f "$firmware"
+}
+
+# Bring the card up now if nothing else holds the DAC.
+activate() {
+    ischroot && return 0
+    [ -d /proc/device-tree ] || return 0
+
+    if node=$(dac_node); then
+        case "$node" in
+            */dac@4d) ;;    # ours, already live
+            *) warn "another overlay is driving the DAC; reboot to switch to \"Creature Analog Audio\"" ;;
+        esac
+        return 0
+    fi
+
+    if command -v dtoverlay >/dev/null; then
+        dtoverlay -d /usr/lib/creature-cm5-audio "$overlay" ||
+            warn "could not apply the overlay now; it applies at the next boot"
+    else
+        warn "dtoverlay not found; the overlay applies at the next boot"
+    fi
+}
+
+# Apply the card IDs from the udev rule to cards already registered.
+rename_cards() {
+    ischroot && return 0
+    command -v udevadm >/dev/null || return 0
+    udevadm control --reload || true
+    udevadm trigger --action=change --subsystem-match=sound || true
+}
+
+case "$1" in
+    configure)
+        install_overlay
+        activate
+        rename_cards
+        ;;
+esac
+
+exit 0

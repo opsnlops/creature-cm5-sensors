@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+overlay=creature-cm5-audio
+firmware=/boot/firmware
+config=$firmware/config.txt
+
+case "$1" in
+    remove|purge)
+        rm -f "$firmware/overlays/$overlay.dtbo"
+        if [ -f "$config" ]; then
+            sed -i '/^# BEGIN creature-cm5-audio/,/^# END creature-cm5-audio/d' "$config"
+            # Re-enable any overlay line postinst disabled.
+            sed -i 's/^#creature-cm5-audio-disabled: //' "$config"
+        fi
+        # Give the HDMI card its kernel ID back now rather than at reboot.
+        if ! ischroot; then
+            for id in /sys/class/sound/card*/id; do
+                [ "$(cat "$id" 2>/dev/null)" = CreatureDigital ] &&
+                    printf vc4hdmi0 > "$id" 2>/dev/null || true
+            done
+        fi
+        # The analog card stays up until reboot: its drivers are in-kernel ones
+        # other things may use, and the running device tree keeps the node.
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

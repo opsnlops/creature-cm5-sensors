@@ -1,11 +1,11 @@
-name: Build Debian package
+name: Build Debian packages
 
 on: [push, pull_request]
 
 jobs:
   build:
     # Arm64 only: this package is specific to the CM5 carrier board.
-    # The .deb is Architecture: all (DKMS source plus an overlay); it is
+    # The .debs are Architecture: all (DKMS source and overlays); they are
     # built on arm64 trixie to match the hosts it installs on.
     runs-on: ubuntu-24.04-arm
     container: debian:trixie
@@ -25,14 +25,14 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential debhelper dh-dkms device-tree-compiler lintian
 
-      - name: Build, check and lint the package
+      - name: Build, check and lint the packages
         run: ./make_packages.sh
 
-      - name: Upload package
+      - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
-          name: creature-cm5-sensors-package
-          path: dist/creature-cm5-sensors_*.deb
+          name: creature-cm5-packages
+          path: dist/*.deb
           if-no-files-found: error
           # Keep per-commit package storage bounded; rebuild older commits.
           retention-days: 7

@@ -24,3 +24,20 @@ Description: power and temperature sensors on the Creature CM5 Carrier board
  every new kernel. Installing the package installs the board's device tree
  overlay, enables it in /boot/firmware/config.txt and applies it straight
  away, so no reboot is needed.
+
+Package: creature-cm5-audio
+Section: sound
+Architecture: all
+Depends: ${misc:Depends}, raspi-firmware
+Recommends: alsa-utils
+Description: audio outputs on the Creature CM5 Carrier board
+ Enables the PCM5122 DAC behind the Creature CM5 Carrier board's RCA line
+ output as the ALSA card "Creature Analog Audio" (hw:CreatureAnalog), and
+ gives the HDMI port's card the ID CreatureDigital (hw:CreatureDigital).
+ .
+ The card is described in a device tree overlay using only generic kernel
+ drivers (simple-audio-card, pcm512x and designware-i2s), so no out-of-tree
+ module is needed. Installing the package installs the overlay and enables
+ it in /boot/firmware/config.txt. If the Allo Boss DAC overlay was enabled
+ for this DAC, it is commented out (and restored when this package is
+ removed); switching from it takes effect at the next reboot.

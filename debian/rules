@@ -12,9 +12,11 @@ DKMS_SRC := debian/$(PKG)/usr/src/pac1954-$(DEB_VERSION_UPSTREAM)
 override_dh_auto_build:
 	dtc -@ -I dts -O dtb -o debian/creature-cm5-sensors.dtbo \
 		overlay/creature-cm5-sensors.dts
+	dtc -@ -I dts -O dtb -o debian/creature-cm5-audio.dtbo \
+		overlay/creature-cm5-audio.dts
 
 override_dh_auto_clean:
-	rm -f debian/creature-cm5-sensors.dtbo
+	rm -f debian/creature-cm5-sensors.dtbo debian/creature-cm5-audio.dtbo
 
 override_dh_auto_install:
 	install -D -m 0644 driver/pac1954.c $(DKMS_SRC)/pac1954.c
@@ -23,6 +25,8 @@ override_dh_auto_install:
 		debian/$(PKG)/usr/lib/$(PKG)/creature-cm5-sensors.dtbo
 	install -D -m 0644 config/creature-cm5.conf \
 		debian/$(PKG)/etc/sensors.d/$(PKG).conf
+	install -D -m 0644 debian/creature-cm5-audio.dtbo \
+		debian/creature-cm5-audio/usr/lib/creature-cm5-audio/creature-cm5-audio.dtbo
 
 override_dh_dkms:
-	dh_dkms -V $(DEB_VERSION_UPSTREAM)
+	dh_dkms -p $(PKG) -V $(DEB_VERSION_UPSTREAM)

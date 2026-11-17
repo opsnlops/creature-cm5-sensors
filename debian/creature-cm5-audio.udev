@@ -1,0 +1,11 @@
+# ALSA card IDs for the Creature CM5 Carrier board's audio outputs, so
+# software can open hw:CreatureAnalog / hw:CreatureDigital whatever order
+# the cards register in. IDs are at most 15 characters, no spaces.
+# The display names stay as the drivers set them: "Creature Analog Audio"
+# (from the overlay) and "vc4-hdmi-0" (fixed in the vc4 driver).
+
+# PCM5122 line out, the simple-audio-card from the creature-cm5-audio overlay.
+SUBSYSTEM=="sound", KERNEL=="card*", DEVPATH=="*/sound-creature-analog/sound/card*", ATTR{id}="CreatureAnalog"
+
+# HDMI0, the board's HDMI connector. (HDMI1 is not wired on this board.)
+SUBSYSTEM=="sound", KERNEL=="card*", ATTR{id}=="vc4hdmi0", ATTR{id}="CreatureDigital"

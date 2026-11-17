@@ -1,4 +1,4 @@
-# Build the PAC1954 hwmon module and the board's device-tree overlay.
+# Build the PAC1954 hwmon module and the board's device-tree overlays.
 #   make            build both
 #   sudo ./install.sh   install (DKMS + overlay + sensors config)
 
@@ -7,9 +7,9 @@ all: module overlay
 module:
 	$(MAKE) -C driver
 
-overlay: overlay/creature-cm5-sensors.dtbo
+overlay: overlay/creature-cm5-sensors.dtbo overlay/creature-cm5-audio.dtbo
 
-overlay/creature-cm5-sensors.dtbo: overlay/creature-cm5-sensors.dts
+overlay/%.dtbo: overlay/%.dts
 	dtc -@ -I dts -O dtb -o $@ $<
 
 clean:

@@ -11,6 +11,9 @@ Linux hwmon support for the sensors on the Creature CM5 Carrier board, so
 
 Both are declared in one device-tree overlay, `overlay/creature-cm5-sensors.dts`.
 
+The repo also builds **`creature-cm5-audio`**, for the board's audio outputs
+(see [Audio](#audio)).
+
 ## PAC1954 channels
 
 All shunts are 4 mΩ (see `~/code/creature-cm5-board/schematic-design.md`).
@@ -28,11 +31,11 @@ average of 8 samples. Readings are cached for 100 ms.
 
 ## Package
 
-Everything ships as one Debian package, `creature-cm5-sensors` (arch: all).
+The sensors ship as one Debian package, `creature-cm5-sensors` (arch: all).
 Install it and you're done. No reboot or manual steps.
 
 ```sh
-./make_packages.sh        # builds dist/creature-cm5-sensors_<ver>_all.deb + lintian report
+./make_packages.sh        # builds both .debs into dist/ + lintian report
 sudo apt install ./dist/creature-cm5-sensors_<ver>_all.deb
 sensors
 ```
@@ -88,3 +91,34 @@ Don't mix this with an installed package on the same host.
 - The MCP9808's limit registers power up at 0 °C, which `sensors` shows as
   ALARM. The package's udev rule sets them; override it by copying the rule
   to `/etc/udev/rules.d/` under the same name.
+
+## Audio
+
+`creature-cm5-audio` drives the PCM5122 DAC (0x4D on I2C1, RP1 I2S0 on
+GPIO18/19/21) behind the RCA line out, using only generic in-kernel drivers:
+`simple-audio-card`, `pcm512x` and `designware-i2s`
+(`overlay/creature-cm5-audio.dts`). The DAC's SCK is grounded, so the Pi
+drives BCLK/LRCLK and the DAC's PLL runs from BCLK.
+
+| ALSA ID | Display name | Output |
+|---|---|---|
+| `CreatureAnalog` | Creature Analog Audio | RCA line out (white = left, red = right) |
+| `CreatureDigital` | vc4-hdmi-0 | HDMI connector |
+
+The IDs come from a udev rule (`/usr/lib/udev/rules.d/60-creature-cm5-audio.rules`),
+so `hw:CreatureAnalog` and `hw:CreatureDigital` work whatever order the cards
+register in. HDMI's display name is fixed in the vc4 driver. HDMI1 isn't
+wired on this board, but its card (`vc4hdmi1`) still appears.
+
+```sh
+speaker-test -D hw:CreatureAnalog -c 2 -t wav -l 1
+```
+
+Installing replaces `dtoverlay=allo-boss-dac-pcm512x-audio,slave`: postinst
+comments that line out and postrm restores it. Both overlays claim 0x4D,
+so when switching from Allo the new card appears after the next reboot.
+On a board with neither enabled, the overlay is applied live.
+
+Unlike the Allo driver, the generic card doesn't cap the **Digital** volume
+at 0 dB. The control goes up to +24 dB, which clips. The DAC powers up at
+0 dB, so leave it there or lower.
