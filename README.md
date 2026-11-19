@@ -17,6 +17,11 @@ The repo also builds **`creature-cm5-audio`**, for the board's audio outputs
 ## PAC1954 channels
 
 All shunts are 4 mΩ (see `~/code/creature-cm5-board/schematic-design.md`).
+On carrier rev B the overlay sets slightly higher values (4186, 4106, 4941
+and 4780 µΩ for channels 1–4). Rev B's sense traces pick up some board copper
+in series with each shunt, measured with a current-flow solve of the rev B
+Gerbers. Without the correction, channels 3 and 4 read about 20 % high. See
+the comment at the top of `overlay/creature-cm5-sensors.dts`.
 
 | sysfs | Label | What it measures |
 |---|---|---|
