@@ -4,6 +4,16 @@
 //   0x18  MCP9808 temperature sensor (in-tree jc42 driver)
 //
 // Shunts are 4 mOhm RLP25 on every channel (schematic-design.md).
+//
+// Carrier rev B calibration: on rev B the PAC1954 sense traces don't all leave
+// from the shunt pads, so each channel also sees some board copper in series
+// with its 4 mOhm shunt. A current-flow solve on the rev B Gerbers (2026-11-18,
+// creature-cm5-board) gives the extra resistance, added to each value below:
+//   ch1 +0.186 mOhm (+4.7 %)   SENSE1- taps PWR_C7 next to the via field
+//   ch2 +0.106 mOhm (+2.7 %)   SENSE2- taps a current-carrying via
+//   ch3 +0.941 mOhm (+23.5 %)  SENSE3+ taps the PD_U2 output pins
+//   ch4 +0.780 mOhm (+19.5 %)  SENSE4+ taps PWR_C5, SENSE4- taps PWR_Q1's source
+// Rev C routes every sense pair Kelvin from its own shunt and goes back to 4000.
 /dts-v1/;
 /plugin/;
 
@@ -25,22 +35,22 @@
 
 				channel@1 {
 					reg = <1>;
-					shunt-resistor-micro-ohms = <4000>;
+					shunt-resistor-micro-ohms = <4186>;	/* rev B: 4000 + 186 */
 					label = "Board In";	/* SYS_24V, total input */
 				};
 				channel@2 {
 					reg = <2>;
-					shunt-resistor-micro-ohms = <4000>;
+					shunt-resistor-micro-ohms = <4106>;	/* rev B: 4000 + 106 */
 					label = "CM5 5V";
 				};
 				channel@3 {
 					reg = <3>;
-					shunt-resistor-micro-ohms = <4000>;
+					shunt-resistor-micro-ohms = <4941>;	/* rev B: 4000 + 941 */
 					label = "Character";	/* USB-C character power */
 				};
 				channel@4 {
 					reg = <4>;
-					shunt-resistor-micro-ohms = <4000>;
+					shunt-resistor-micro-ohms = <4780>;	/* rev B: 4000 + 780 */
 					label = "PoE";		/* AG5810 output only */
 				};
 			};
