@@ -12,7 +12,8 @@ Linux hwmon support for the sensors on the Creature CM5 Carrier board, so
 Both are declared in one device-tree overlay, `overlay/creature-cm5-sensors.dts`.
 
 The repo also builds **`creature-cm5-audio`**, for the board's audio outputs
-(see [Audio](#audio)).
+(see [Audio](#audio)), and **`creature-cm5-revb-workarounds`**, for rev B
+boards only (see [Rev B workarounds](#rev-b-workarounds)).
 
 ## PAC1954 channels
 
@@ -127,3 +128,27 @@ On a board with neither enabled, the overlay is applied live.
 Unlike the Allo driver, the generic card doesn't cap the **Digital** volume
 at 0 dB. The control goes up to +24 dB, which clips. The DAC powers up at
 0 dB, so leave it there or lower.
+
+## Rev B workarounds
+
+`creature-cm5-revb-workarounds` is for **rev B boards only**. It installs
+`creature-cm5-revb-workarounds.service`, a oneshot that runs at boot.
+
+| Bug | Workaround |
+|---|---|
+| The character USB-C port can't deliver 12 V. The TPS25750 sources only 5 V, because its high-voltage path (PPHV) is sink-only, but the EEPROM also offers 12 V. A sink that asks for 12 V (most phones do) loops through hard resets, and CHAR ON blinks. | `pd-5v-only` waits for the TPS25750 (0x21) to reach APP mode, then rewrites its TX Source Caps (0x32) to advertise 5 V / 3 A only, and re-sends them to a sink that's already attached. |
+
+What to know about the 5 V-only change:
+
+- **Where it lives:** it's written to the TPS25750's RAM. The EEPROM is never touched.
+- **How long it lasts:** it survives a Pi reboot, because the PD controller stays powered. It's lost when the board loses power, and the service puts it back at the next boot.
+- **Safety check:** the script makes no change unless PDO1 is a fixed 5 V supply.
+- **Removing the package:** the 12 V offer comes back after the next power cycle, and so do the hard resets.
+- **Permanent fix:** an EEPROM image that offers 5 V only. With that image, this service has nothing to do.
+
+The service's output is in the journal:
+
+```sh
+journalctl -u creature-cm5-revb-workarounds
+```
+

@@ -1,0 +1,95 @@
+#!/bin/sh
+# Rev B workaround: make the character USB-C port offer 5 V only.
+#
+# The TPS25750 (0x21 on I2C1) loads its configuration from the PD EEPROM at
+# power-on and offers 5 V / 3 A and 12 V / 3 A. The TPS25750 can't source
+# 12 V: PPHV is a sink-only path, so it never turns on for the 12 V PDO and
+# the chip hard-resets with UnableToSource. A sink that asks for 12 V loops
+# through hard resets. This rewrites TX Source Caps (0x32) to advertise PDO1
+# only, then asks the chip to re-send its caps.
+#
+# The change lives in the TPS25750's RAM: it survives a Pi reboot and is lost
+# when the board loses power. The EEPROM is never written.
+set -eu
+
+bus=1
+addr=0x21
+
+log() { echo "pd-5v-only: $*"; }
+die() { log "$*" >&2; exit 1; }
+
+[ -e "/dev/i2c-$bus" ] || die "/dev/i2c-$bus not found (is i2c-dev loaded?)"
+
+# MODE (0x03) reads "APP " once the firmware is running from the EEPROM.
+app_mode() {
+    [ "$(i2cget -y "$bus" "$addr" 0x03 i 5 2>/dev/null)" = "0x04 0x41 0x50 0x50 0x20" ]
+}
+
+tries=0
+until app_mode; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 50 ] || die "TPS25750 at $addr on i2c-$bus is not in APP mode after 10 s"
+    sleep 0.2
+done
+
+# TX Source Caps: length (0x1f), header (PDO count in bits 2:0), two bytes of
+# power-path selection, then up to seven 4-byte PDOs.
+# shellcheck disable=SC2046
+set -- $(i2cget -y "$bus" "$addr" 0x32 i 32)
+[ "$#" -eq 32 ] && [ "$1" = 0x1f ] || die "unexpected TX Source Caps read: $*"
+header=$2
+count=$((header & 7))
+
+# Only proceed if PDO1 is a 5 V fixed supply; otherwise this EEPROM is not
+# the one this script was written for. Voltage is bits 19:10, 50 mV units.
+pdo1_type=$(( ($8 >> 6) & 3 ))
+pdo1_raw=$(( $6 | ($7 << 8) ))
+pdo1_mv=$(( ( (pdo1_raw >> 2) & 0x3ff ) * 50 ))
+[ "$pdo1_type" -eq 0 ] && [ "$pdo1_mv" -eq 5000 ] ||
+    die "PDO1 is not a fixed 5 V supply (type $pdo1_type, $pdo1_mv mV); not changing anything"
+
+if [ "$count" -eq 1 ]; then
+    log "already advertising 5 V only"
+    exit 0
+fi
+
+shift 2
+new_header=$(( (header & ~7) | 1 ))
+# shellcheck disable=SC2068
+i2cset -y "$bus" "$addr" 0x32 "$new_header" $@ s
+set -- $(i2cget -y "$bus" "$addr" 0x32 i 2)
+[ "$(( $2 & 7 ))" -eq 1 ] || die "TX Source Caps write did not stick (header $2)"
+log "source caps set to 5 V only (was $count PDOs)"
+
+# A sink that is already attached keeps the caps it was sent at attach. Tell
+# the chip to send the new ones (4CC 'SSrC'). It is rejected during a hard
+# reset, so retry; if it never succeeds, the next negotiation uses the new
+# caps anyway.
+plug_present() {
+    set -- $(i2cget -y "$bus" "$addr" 0x1a i 2)
+    [ "$(( $2 & 1 ))" -eq 1 ]
+}
+
+send_caps() {
+    i2cset -y "$bus" "$addr" 0x08 0x53 0x53 0x72 0x43 s
+    n=0
+    while [ "$(i2cget -y "$bus" "$addr" 0x08 i 5)" != "0x04 0x00 0x00 0x00 0x00" ]; do
+        n=$((n + 1))
+        [ "$n" -lt 20 ] || return 1
+        sleep 0.1
+    done
+    set -- $(i2cget -y "$bus" "$addr" 0x09 i 2)
+    [ "$2" = 0x00 ]
+}
+
+if plug_present; then
+    for _ in 1 2 3 4 5; do
+        if send_caps; then
+            log "re-sent source caps to the attached sink"
+            exit 0
+        fi
+        sleep 0.5
+    done
+    log "SSrC not accepted; the attached sink gets the new caps at its next negotiation"
+fi
+exit 0

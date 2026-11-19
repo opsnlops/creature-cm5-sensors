@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build the creature-cm5-sensors and creature-cm5-audio .debs into dist/, check it, and report
+# Build the creature-cm5-sensors, creature-cm5-audio and creature-cm5-revb-workarounds .debs into dist/, check it, and report
 # lintian findings. GitHub Actions runs this same script in debian:trixie.
 #
 # Build on the fleet's Debian release (trixie). Needs debhelper, dh-dkms,
-# device-tree-compiler and lintian. Both packages are arch: all; each host
+# device-tree-compiler and lintian. All packages are arch: all; each host
 # compiles the PAC1954 module itself with DKMS.
 set -euo pipefail
 
@@ -11,12 +11,12 @@ cd "$(dirname "$0")"
 rm -rf dist && mkdir -p dist
 
 dpkg-buildpackage -us -uc -b
-mv ../creature-cm5-sensors_*.deb ../creature-cm5-audio_*.deb \
+mv ../creature-cm5-sensors_*.deb ../creature-cm5-audio_*.deb ../creature-cm5-revb-workarounds_*.deb \
    ../creature-cm5-sensors_*.buildinfo ../creature-cm5-sensors_*.changes dist/
 
 shopt -s nullglob
 debs=(dist/*.deb)
-[ "${#debs[@]}" -eq 2 ] || { echo "expected two .debs, found ${#debs[@]}" >&2; exit 1; }
+[ "${#debs[@]}" -eq 3 ] || { echo "expected three .debs, found ${#debs[@]}" >&2; exit 1; }
 for deb in "${debs[@]}"; do
     ./check_package.sh "$deb"
 done

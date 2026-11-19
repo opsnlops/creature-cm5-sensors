@@ -1,5 +1,6 @@
 #!/bin/bash
-# Check a built creature-cm5-sensors or creature-cm5-audio .deb: control
+# Check a built creature-cm5-sensors, creature-cm5-audio or
+# creature-cm5-revb-workarounds .deb: control
 # fields and file layout.
 # Inspects the archive itself; on a usr-merged system an installed-file
 # check cannot tell /lib from /usr/lib.
@@ -62,9 +63,19 @@ check_sensors() {
         grep -q 'microchip,pac1954' || fail "overlay has no microchip,pac1954 node"
 }
 
+check_revb() {
+    dpkg-deb -f "$deb" Depends | grep -q 'i2c-tools' || fail "missing i2c-tools dependency"
+    require ./usr/libexec/creature-cm5-revb-workarounds/pd-5v-only \
+        ./usr/lib/systemd/system/creature-cm5-revb-workarounds.service \
+        ./usr/share/doc/creature-cm5-revb-workarounds/copyright
+    [ -x "$tmp/usr/libexec/creature-cm5-revb-workarounds/pd-5v-only" ] || fail "pd-5v-only is not executable"
+    sh -n "$tmp/usr/libexec/creature-cm5-revb-workarounds/pd-5v-only" || fail "pd-5v-only has a syntax error"
+}
+
 case "$package" in
     creature-cm5-sensors) check_sensors ;;
     creature-cm5-audio) check_audio ;;
+    creature-cm5-revb-workarounds) check_revb ;;
     *) fail "unknown package $package" ;;
 esac
 

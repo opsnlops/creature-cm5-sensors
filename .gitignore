@@ -11,6 +11,7 @@
 dist/
 debian/creature-cm5-sensors/
 debian/creature-cm5-audio/
+debian/creature-cm5-revb-workarounds/
 debian/.debhelper/
 debian/debhelper-build-stamp
 debian/files

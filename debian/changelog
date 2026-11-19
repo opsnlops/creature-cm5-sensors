@@ -1,3 +1,12 @@
+creature-cm5-sensors (0.3.0) unstable; urgency=medium
+
+  * New binary package creature-cm5-revb-workarounds, for rev B boards only:
+    a boot-time service that makes the character USB-C port offer 5 V only.
+    The TPS25750 can't source 12 V (PPHV is sink-only), so a sink that
+    asks for 12 V loops through hard resets.
+
+ -- April White <april@opsnlops.io>  Mon, 16 Nov 2026 19:30:00 -0800
+
 creature-cm5-sensors (0.2.0) unstable; urgency=medium
 
   * New binary package creature-cm5-audio: the board's PCM5122 line out as

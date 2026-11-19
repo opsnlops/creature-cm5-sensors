@@ -1,0 +1,13 @@
+[Unit]
+Description=Workarounds for Creature CM5 Carrier rev B hardware bugs
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/sbin/modprobe i2c-dev
+# Character USB-C: offer 5 V only (the TPS25750 can't source 12 V).
+ExecStart=/usr/libexec/creature-cm5-revb-workarounds/pd-5v-only
+
+[Install]
+WantedBy=multi-user.target

@@ -41,3 +41,21 @@ Description: audio outputs on the Creature CM5 Carrier board
  it in /boot/firmware/config.txt. If the Allo Boss DAC overlay was enabled
  for this DAC, it is commented out (and restored when this package is
  removed); switching from it takes effect at the next reboot.
+
+Package: creature-cm5-revb-workarounds
+Section: misc
+Architecture: all
+Depends: ${misc:Depends}, i2c-tools, kmod
+Description: workarounds for Creature CM5 Carrier rev B hardware bugs
+ Install this only on rev B Creature CM5 Carrier boards. A systemd service
+ runs at boot and works around known rev B hardware bugs:
+ .
+  * Character USB-C offers 5 V only. The TPS25750 PD controller can source
+    only 5 V: its high-voltage power path is sink-only. The EEPROM still
+    offers 12 V, so a sink that asks for 12 V loops through hard resets.
+    The service rewrites the controller's source capabilities (in its RAM,
+    not the EEPROM) to advertise 5 V / 3 A only.
+ .
+ The PD controller keeps the change until the board loses power. After the
+ package is removed, the 12 V offer comes back at the next power cycle, and
+ a sink that asks for 12 V loops through hard resets again.

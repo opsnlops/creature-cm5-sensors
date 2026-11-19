@@ -27,6 +27,8 @@ override_dh_auto_install:
 		debian/$(PKG)/etc/sensors.d/$(PKG).conf
 	install -D -m 0644 debian/creature-cm5-audio.dtbo \
 		debian/creature-cm5-audio/usr/lib/creature-cm5-audio/creature-cm5-audio.dtbo
+	install -D -m 0755 revb/pd-5v-only \
+		debian/creature-cm5-revb-workarounds/usr/libexec/creature-cm5-revb-workarounds/pd-5v-only
 
 override_dh_dkms:
 	dh_dkms -p $(PKG) -V $(DEB_VERSION_UPSTREAM)
